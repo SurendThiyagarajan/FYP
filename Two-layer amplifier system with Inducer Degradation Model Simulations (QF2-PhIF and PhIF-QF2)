@@ -1,0 +1,136 @@
+"""
+Created on Tue Mar 19 20:47:56 2024
+
+@author: Surend
+"""
+
+import matplotlib.pyplot as plt
+import numpy as np
+from scipy.integrate import odeint
+
+plt.close('all')
+
+plt.rcdefaults()
+plt.rcParams['font.family'] = 'Arial'
+plt.rcParams['font.weight'] = 'normal' #'bold'
+plt.rcParams['font.size'] = 15 
+plt.rcParams['axes.labelsize'] = 15
+plt.rcParams['axes.labelweight'] = 'normal' #'bold'
+plt.rcParams['axes.linewidth'] = 1
+plt.rcParams['axes.formatter.limits'] = (-2, 3)
+plt.rcParams['figure.subplot.bottom'] = 0.17
+plt.rcParams['figure.subplot.left'] = 0.12
+plt.rcParams['legend.frameon'] = False
+plt.rcParams['legend.fontsize'] = 10 
+plt.rcParams["legend.handletextpad"] = 0.3
+plt.rcParams["legend.columnspacing"] = 0.5
+plt.rcParams["legend.borderaxespad"] = 0
+plt.rcParams.update({'axes.spines.top': False, 'axes.spines.right': False}) 
+plt.rcParams['lines.markersize'] = 5
+
+def ind_model(y, t, ind):
+    Ind, mRNA, mRNA_1, mRNA_2, protein, protein_1, protein_2 = y[:]
+    # Best-fitted pGAL Parameters
+    degind = 0.399842
+    Ki = 1.91812
+    ni = 4.99499
+    synM = 6816.25
+    Kind = 840.529
+    synP = 72.9331
+    degP = 0.0800913
+    n = 0.590304
+    # Best-fitted QF2 Parameters
+    v = 108.341
+    synM_1 = 832.702
+    Kind_1 = 13507.7
+    synP_1 = 1595.02
+    degP_1 = 1.60961
+    n_1 = 2.43873
+    # Best-fitted PhIF Parameters
+    v_1 = 239.067
+    synM_2 = 2241.38
+    Kind_2 = 12228.6
+    synP_2 = 240.12
+    degP_2 = 0.534801
+    n_2 = 3.32834
+    # Best-fitted Parameters for PhIF-QF2 2L system
+    # v = 239.067
+    # synM_1 = 2241.38
+    # Kind_1 = 12228.6
+    # synP_1 = 240.12
+    # degP_1 = 0.534801
+    # n_1 = 3.32834
+    # v_1 = 108.341
+    # synM_2 = 832.702
+    # Kind_2 = 13507.7
+    # synP_2 = 1595.02
+    # degP_2 = 1.60961
+    # n_2 = 2.43873
+    degM = 8.317
+    dInd = -degind * ((Ind**ni)/((Ind**ni)+(Ki**ni)))
+    dmRNA = synM*((ind**n)/((ind**n)+(Kind**n))) - degM*mRNA
+    dprotein = synP*mRNA - degP*protein
+    dmRNA_1 = v + (synM_1*((protein**n_1)/((protein**n_1)+(Kind_1**n_1)))) - degM*mRNA_1
+    dprotein_1 = synP_1*mRNA_1 - degP_1*protein_1
+    dmRNA_2 = v_1 + (synM_2*((protein_1**n_2)/((protein_1**n_2)+(Kind_2**n_2)))) - degM*mRNA_2
+    dprotein_2 = synP_2*mRNA_2 - degP_2*protein_2
+    
+    dydt = [dInd, dmRNA, dmRNA_1, dmRNA_2, dprotein, dprotein_1, dprotein_2]
+    
+    return dydt
+
+def pred_data(x):
+    protein_m = np.zeros((len(tspan), len(ind)))
+    
+    for i, _ in enumerate(ind):
+        y0 = [ind[i], 0, 10, 30, 0, 10116, 1902.037] # for QF2-PhIF
+        #y0 = [ind[i], 0, 30, 10, 0, 1902.037, 10116] (for PhIF-QF2)
+        sol = odeint(ind_model, y0, tspan, args=(ind[i],))
+        
+        protein_m[:,i] = sol[:,6]
+        
+    return protein_m
+
+if __name__ == "__main__":
+    ind = [0, 1, 10]
+    tspan = np.linspace(0, 24, 25)
+    
+    def draw_graph(inducer):
+        Header = inducer
+    
+        mRNA_ = np.zeros((len(tspan), len(inducer)))
+        protein_ = np.zeros((len(tspan), len(inducer)))
+        Ind_ = np.zeros((len(tspan), len(inducer)))
+        
+        for i, _ in enumerate(inducer):
+            y0 = [ind[i], 0, 10, 30, 0, 10116, 1902.037] # for QF2-PhIF
+            # y0 = [ind[i], 0, 30, 10, 0, 1902.037, 10116] (for PhIF-QF2)
+            sol = odeint(ind_model, y0, tspan, args=(inducer[i],))
+            Ind_[:, i] = sol[:, 0]
+            mRNA_[:,i] = sol[:,3]
+            protein_[:,i] = sol[:,6]
+    
+        plt.figure(figsize=(12, 4))
+        plt.subplots_adjust(hspace=0.4, wspace=0.3)
+        axes2 = [plt.subplot(1, 3, i) for i in range(1, 4)]  
+        for i, a in enumerate(axes2):
+            a.set_xlabel('Time (hr)')
+
+            if i == 0:
+                a.plot(tspan, Ind_)
+                a.set_ylabel('Inducer concentration')
+            elif i == 1:
+                a.plot(tspan, mRNA_)
+                a.set_ylabel('mRNA (au)')
+            elif i == 2:
+                a.set_prop_cycle(None)
+                a.plot(tspan, protein_)
+                a.set_ylabel('protein (au)')
+                
+            a.legend(Header)
+                
+            plt.tight_layout()
+        
+        plt.show()  
+    
+    draw_graph(ind)
